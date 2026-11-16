@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Animal Safari - Fun Learning for Kids</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Fredoka & Quicksand -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: #FDFBF7; /* Warm Cream */
+            color: #2D3748;
+        }
+        h1, h2, h3, .font-fredoka {
+            font-family: 'Fredoka', cursive;
+        }
+        .bouncy-btn {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s;
+        }
+        .bouncy-btn:hover {
+            transform: scale(1.05);
+        }
+        .bouncy-btn:active {
+            transform: scale(0.95);
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-4 sm:p-6 bg-[#FDFBF7] selection:bg-[#A3E635]">
+
+    <!-- Header / Navbar -->
+    <header class="w-full max-w-3xl flex items-center justify-between bg-white/80 backdrop-blur-md px-6 py-4 rounded-3xl shadow-sm border border-[#E2E8F0] mb-4">
+        <div class="flex items-center space-x-3">
+            <span class="text-3xl floating">🚀</span>
+            <h1 class="text-2xl sm:text-3xl font-fredoka text-[#38BDF8] tracking-wide">Space Safari</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <!-- Score & Stars -->
+            <div class="flex items-center bg-[#FEF08A]/60 px-4 py-2 rounded-full border border-[#FDE047]">
+                <span class="text-xl mr-2">⭐</span>
+                <span id="score-display" class="font-fredoka text-xl text-[#854D0E]">0</span>
+            </div>
+            <!-- Sound Toggle -->
+            <button id="sound-toggle" onclick="toggleSound()" class="bouncy-btn bg-[#E0F2FE] hover:bg-[#BAE6FD] p-2.5 rounded-full text-xl shadow-sm" title="Toggle Sound">
+                🔊
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="w-full max-w-3xl bg-white rounded-3xl shadow-lg border border-[#F1F5F9] p-6 sm:p-8 flex flex-col items-center text-center relative overflow-hidden">
+        
+        <!-- Instructions / Status -->
+        <div id="game-status" class="mb-6">
+            <h2 class="text-2xl sm:text-3xl font-fredoka text-[#475569] mb-1">Match the Space Animal!</h2>
+            <p id="instruction-text" class="text-lg text-[#64748B]">Find and tap the correct animal for the spaceship habitat.</p>
+        </div>
+
+        <!-- Target Habitat Card (Question) -->
+        <div id="target-habitat" class="w-full max-w-md bg-[#F0FDF4] border-2 border-dashed border-[#86EFAC] rounded-3xl p-6 mb-8 flex flex-col items-center justify-center floating shadow-inner">
+            <span id="target-emoji" class="text-6xl sm:text-7xl mb-2">🪐</span>
+            <span id="target-name" class="font-fredoka text-xl text-[#166534]">Cosmic Planet</span>
+        </div>
+
+        <!-- Choices Grid -->
+        <div id="choices-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-lg mb-6">
+            <!-- Dynamically populated choice cards -->
+        </div>
+
+        <!-- Success Modal / Overlay (Hidden by default) -->
+        <div id="success-modal" class="hidden absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 z-20 transition-all duration-300">
+            <span class="text-7xl mb-3 animate-bounce">🎉</span>
+            <h3 class="text-3xl font-fredoka text-[#16A34A] mb-2">Fantastic Job!</h3>
+            <p class="text-lg text-[#475569] mb-6">You matched all the space animals correctly!</p>
+            <button onclick="restartGame()" class="bouncy-btn bg-[#4ADE80] hover:bg-[#22C55E] text-white font-fredoka text-xl px-8 py-3 rounded-2xl shadow-md">
+                Play Again 🚀
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-3xl text-center py-4 text-sm text-[#94A3B8] font-medium">
+        Made with ❤️ for Kids • Ready for Vercel & GitHub
+    </footer>
+
+    <!-- Game Logic JavaScript -->
+    <script>
+        // Audio Context for synthesized sound effects
+        let soundEnabled = true;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'success') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.08);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(120, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-toggle').innerText = soundEnabled ? '🔊' : '🔇';
+        }
+
+        // Game Data
+        const animals = [
+            { name: "Star Bunny", emoji: "🐰", habitatEmoji: "🌕", habitatName: "Moon Base" },
+            { name: "Galaxy Cat", emoji: "🐱", habitatEmoji: "🌌", habitatName: "Milky Way" },
+            { name: "Rocket Dog", emoji: "🐶", habitatEmoji: "🚀", habitatName: "Rocket Ship" },
+            { name: "Cosmic Fox", emoji: "🦊", habitatEmoji: "🪐", habitatName: "Ringed Planet" },
+            { name: "Alien Bear", emoji: "🐻", habitatEmoji: "🛸", habitatName: "UFO Cruiser" },
+            { name: "Solar Turtle", emoji: "🐢", habitatEmoji: "☀️", habitatName: "Sunny Asteroid" }
+        ];
+
+        let currentRound = 0;
+        let score = 0;
+        let currentTarget = null;
+        const totalRounds = 5;
+
+        function shuffle(array) {
+            return array.sort(() => Math.random() - 0.5);
+        }
+
+        function startGame() {
+            currentRound = 0;
+            score = 0;
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('success-modal').classList.add('hidden');
+            nextRound();
+        }
+
+        function nextRound() {
+            if (currentRound >= totalRounds) {
+                endGame();
+                return;
+            }
+            currentRound++;
+
+            // Pick a random target from animals
+            const shuffledAnimals = shuffle([...animals]);
+            currentTarget = shuffledAnimals[0];
+
+            // Update habitat UI
+            document.getElementById('target-emoji').innerText = currentTarget.habitatEmoji;
+            document.getElementById('target-name').innerText = currentTarget.habitatName;
+            document.getElementById('instruction-text').innerText = `Round ${currentRound} of ${totalRounds}: Who lives on the ${currentTarget.habitatName}?`;
+
+            // Pick 3 distractors + correct choice = 4 choices
+            let choices = [currentTarget];
+            let distractors = shuffledAnimals.slice(1, 4);
+            choices = shuffle([...choices, ...distractors]);
+
+            // Render choices grid
+            const grid = document.getElementById('choices-grid');
+            grid.innerHTML = '';
+            choices.forEach(animal => {
+                const btn = document.createElement('button');
+                btn.className = "bouncy-btn bg-[#F8FAFC] hover:bg-[#E0F2FE] border-2 border-[#E2E8F0] hover:border-[#38BDF8] rounded-3xl p-4 flex flex-col items-center justify-center shadow-sm cursor-pointer transition-all";
+                btn.innerHTML = `
+                    <span class="text-5xl mb-2">${animal.emoji}</span>
+                    <span class="font-fredoka text-sm text-[#475569]">${animal.name}</span>
+                `;
+                btn.onclick = () => checkAnswer(animal, btn);
+                grid.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selectedAnimal, element) {
+            if (selectedAnimal.name === currentTarget.name) {
+                // Correct!
+                playSound('success');
+                score += 20;
+                document.getElementById('score-display').innerText = score;
+                element.classList.add('bg-[#DCFCE7]', 'border-[#4ADE80]', 'scale-105');
+                
+                // Mini confetti burst
+                confetti({
+                    particleCount: 40,
+                    spread: 60,
+                    origin: { y: 0.6 }
+                });
+
+                setTimeout(() => {
+                    nextRound();
+                }, 1000);
+            } else {
+                // Wrong
+                playSound('wrong');
+                element.classList.add('bg-[#FEE2E2]', 'border-[#F87171]', 'animate-bounce');
+                setTimeout(() => {
+                    element.classList.remove('bg-[#FEE2E2]', 'border-[#F87171]', 'animate-bounce');
+                }, 500);
+            }
+        }
+
+        function endGame() {
+            playSound('success');
+            document.getElementById('success-modal').classList.remove('hidden');
+            confetti({
+                particleCount: 150,
+                spread: 100,
+                origin: { y: 0.5 }
+            });
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        // Initialize game on load
+        window.onload = startGame;
+    </script>
+</body>
+</html>
